@@ -1,9 +1,13 @@
-use std::{env, fs, io::Write};
+use std::{env, fs::File, io::Write};
+
+use memmap2::Mmap;
 
 fn main() {
     let if_sort = parse_optional_sort_flag(env::args()).unwrap();
 
-    let data = fs::read("mdf-kospi200.20110216-0.pcap").unwrap();
+    let file = File::open("mdf-kospi200.20110216-0.pcap").unwrap();
+
+    let data = unsafe { Mmap::map(&file).unwrap() };
 
     let flag = is_big_endian(&data);
 
