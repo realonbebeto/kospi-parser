@@ -1,4 +1,4 @@
-use std::{env, fmt::Display, fs};
+use std::{env, fs, io::Write};
 
 fn main() {
     let if_sort = parse_optional_sort_flag(env::args()).unwrap();
@@ -7,7 +7,7 @@ fn main() {
 
     let flag = is_big_endian(&data);
 
-    let mut messages: Vec<Message<'_>> = Vec::with_capacity(2048);
+    let mut messages = Vec::with_capacity(2048);
 
     // Global header size
     let mut offset = 24;
@@ -41,9 +41,13 @@ fn main() {
         });
     }
 
-    for m in messages {
-        print!("{}\n", m)
+    let mut buf: Vec<u8> = Vec::with_capacity(2048 * 100);
+
+    for msg in messages {
+        msg.write_bytes(&mut buf);
     }
+
+    std::io::stdout().lock().write_all(&buf).unwrap();
 }
 
 #[allow(unused)]
@@ -74,36 +78,120 @@ struct Message<'a> {
     aprice5: f64,
 }
 
-impl Display for Message<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {} {} {}@{} {}@{}",
-            self.pkt_time,
-            format_time(self.acc_time),
-            self.issue_code,
-            self.bqty5,
-            self.bprice5,
-            self.bqty4,
-            self.bprice4
-        )
+impl Message<'_> {
+    pub fn write_bytes(&self, buf: &mut Vec<u8>) {
+        let hh = (self.acc_time / 1_000_000) as u8;
+        let mm = ((self.acc_time / 10_000) % 100) as u8;
+        let ss = ((self.acc_time / 100) % 100) as u8;
+        let uu = (self.acc_time % 100) as u8;
+
+        write_int(buf, self.pkt_time);
+        buf.push(b' ');
+        write_2digits(buf, hh);
+        buf.push(b':');
+        write_2digits(buf, mm);
+        buf.push(b':');
+        write_2digits(buf, ss);
+        buf.push(b':');
+        write_2digits(buf, uu);
+        buf.push(b' ');
+        buf.extend_from_slice(self.issue_code.as_bytes());
+        buf.push(b' ');
+        write_float(buf, self.bqty5, 1);
+        buf.push(b'@');
+        write_float(buf, self.bprice5, 1);
+        buf.push(b' ');
+        write_float(buf, self.bqty4, 1);
+        buf.push(b'@');
+        write_float(buf, self.bprice4, 1);
+        buf.push(b' ');
+        write_float(buf, self.bqty3, 1);
+        buf.push(b'@');
+        write_float(buf, self.bprice3, 1);
+        buf.push(b' ');
+        write_float(buf, self.bqty2, 1);
+        buf.push(b'@');
+        write_float(buf, self.bprice2, 1);
+        buf.push(b' ');
+        write_float(buf, self.bqty1, 1);
+        buf.push(b'@');
+        write_float(buf, self.bprice1, 1);
+        buf.push(b' ');
+        write_float(buf, self.aqty1, 1);
+        buf.push(b'@');
+        write_float(buf, self.aprice1, 1);
+        buf.push(b' ');
+        write_float(buf, self.aqty2, 1);
+        buf.push(b'@');
+        write_float(buf, self.aprice2, 1);
+        buf.push(b' ');
+        write_float(buf, self.aqty3, 1);
+        buf.push(b'@');
+        write_float(buf, self.aprice3, 1);
+        buf.push(b' ');
+        write_float(buf, self.aqty4, 1);
+        buf.push(b'@');
+        write_float(buf, self.aprice4, 1);
+        buf.push(b' ');
+        write_float(buf, self.aqty5, 1);
+        buf.push(b'@');
+        write_float(buf, self.aprice5, 1);
+        buf.push(b'\n');
     }
 }
 
-fn format_time(n: u32) -> String {
-    let hh = n / 1_000_000;
-    let mm = (n / 10_000) % 100;
-    let ss = (n / 100) % 100;
-    let uu = n % 100;
+#[inline]
+fn write_2digits(buf: &mut Vec<u8>, n: u8) {
+    buf.push(b'0' + n / 10);
+    buf.push(b'0' + n % 10);
+}
 
-    format!("{:02}:{:02}:{:02}:{:02}", hh, mm, ss, uu)
+fn write_int(buf: &mut Vec<u8>, mut n: u32) {
+    if n == 0 {
+        buf.push(b'0');
+        return;
+    }
+    let start = buf.len();
+    while n > 0 {
+        buf.push(b'0' + (n % 10) as u8);
+        n /= 10;
+    }
+    buf[start..].reverse(); // digits were pushed in reverse
+}
+
+fn write_float(buf: &mut Vec<u8>, n: f64, decimal_places: usize) {
+    if n < 0.0 {
+        buf.push(b'-');
+    }
+    let n = n.abs();
+    let int_part = n as u32;
+    let frac_part = n - int_part as f64;
+
+    write_int(buf, int_part);
+
+    if decimal_places > 0 {
+        buf.push(b'.');
+        // shift fractional part into an integer
+        let scale = 10u64.pow(decimal_places as u32);
+        let frac_digits = (frac_part * scale as f64).round() as u64;
+        // must zero-pad — e.g. 0.05 → frac_digits=5, needs "05" not "5"
+        let mut tmp = [0u8; 20];
+        let mut pos = decimal_places;
+        let mut f = frac_digits;
+        while pos > 0 {
+            pos -= 1;
+            tmp[pos] = b'0' + (f % 10) as u8;
+            f /= 10;
+        }
+        buf.extend_from_slice(&tmp[..decimal_places]);
+    }
 }
 
 fn parse_message<'a>(msg: &'a [u8], pkt_time: u32) -> Result<Message<'a>, ParseError> {
     let msg = &msg[42..];
 
     let acc_time = parse_hhmmssuu((&msg[206..214]).try_into().unwrap());
-    let issue_code = str::from_utf8(&msg[5..17]).map_err(|_| ParseError::InvalidUtf8)?;
+    let issue_code = unsafe { str::from_utf8_unchecked(&msg[5..17]) };
     let bqty5 = str::from_utf8(&msg[82..89])
         .map_err(|_| ParseError::InvalidUtf8)?
         .trim()
