@@ -1,9 +1,13 @@
-use std::{fmt::Display, fs};
+use std::{env, fmt::Display, fs};
 
 fn main() {
+    let if_sort = parse_optional_sort_flag(env::args()).unwrap();
+
     let data = fs::read("mdf-kospi200.20110216-0.pcap").unwrap();
 
     let flag = is_big_endian(&data);
+
+    let mut messages: Vec<Message<'_>> = Vec::with_capacity(2048);
 
     // Global header size
     let mut offset = 24;
@@ -18,9 +22,8 @@ fn main() {
             // Select the bytes to be parser
             let dd = &data[offset..offset + packet_header.len as usize];
 
-            let ts = format!("{}", packet_header.ts_sec);
-
-            let _message = parse_message(dd, &ts).unwrap();
+            let message = parse_message(dd, packet_header.ts_sec).unwrap();
+            messages.push(message);
 
             // Update the offset to handle next packet
             offset += packet_header.len as usize;
@@ -29,13 +32,25 @@ fn main() {
             offset += packet_header.len as usize;
         }
     }
+
+    if if_sort {
+        messages.sort_unstable_by(|a, b| {
+            a.acc_time
+                .partial_cmp(&b.acc_time)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+
+    for m in messages {
+        print!("{}\n", m)
+    }
 }
 
 #[allow(unused)]
 #[derive(Debug)]
 struct Message<'a> {
-    pkt_time: &'a str,
-    acc_time: &'a str,
+    pkt_time: u32,
+    acc_time: u32,
     issue_code: &'a str,
     bqty5: f64,
     bprice5: f64,
@@ -65,7 +80,7 @@ impl Display for Message<'_> {
             f,
             "{} {} {} {}@{} {}@{}",
             self.pkt_time,
-            self.acc_time,
+            format_time(self.acc_time),
             self.issue_code,
             self.bqty5,
             self.bprice5,
@@ -75,10 +90,19 @@ impl Display for Message<'_> {
     }
 }
 
-fn parse_message<'a>(msg: &'a [u8], pkt_time: &'a str) -> Result<Message<'a>, ParseError> {
+fn format_time(n: u32) -> String {
+    let hh = n / 1_000_000;
+    let mm = (n / 10_000) % 100;
+    let ss = (n / 100) % 100;
+    let uu = n % 100;
+
+    format!("{:02}:{:02}:{:02}:{:02}", hh, mm, ss, uu)
+}
+
+fn parse_message<'a>(msg: &'a [u8], pkt_time: u32) -> Result<Message<'a>, ParseError> {
     let msg = &msg[42..];
 
-    let acc_time = str::from_utf8(&msg[206..214]).map_err(|_| ParseError::InvalidUtf8)?;
+    let acc_time = parse_hhmmssuu((&msg[206..214]).try_into().unwrap());
     let issue_code = str::from_utf8(&msg[5..17]).map_err(|_| ParseError::InvalidUtf8)?;
     let bqty5 = str::from_utf8(&msg[82..89])
         .map_err(|_| ParseError::InvalidUtf8)?
@@ -268,4 +292,24 @@ fn read_u32_le(data: &[u8]) -> u32 {
 
 fn read_u32_be(data: &[u8]) -> u32 {
     u32::from_be_bytes(data.try_into().unwrap())
+}
+
+fn parse_optional_sort_flag(mut args: env::Args) -> Result<bool, &'static str> {
+    args.next();
+
+    match args.next() {
+        Some(sort_param) if sort_param == "-r" => Ok(true),
+        Some(_) => {
+            Err("Unknown argument. Only `-r` allowed for sorting packets by quote accept time")
+        }
+        None => Ok(false),
+    }
+}
+
+fn parse_hhmmssuu(bytes: &[u8; 8]) -> u32 {
+    let mut n = 0u32;
+    for &b in bytes {
+        n = n * 10 + (b - b'0') as u32;
+    }
+    n
 }
