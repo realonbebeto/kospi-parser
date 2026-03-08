@@ -147,16 +147,18 @@ fn write_2digits(buf: &mut Vec<u8>, n: u8) {
 }
 
 fn write_int(buf: &mut Vec<u8>, mut n: u32) {
+    let mut tmp = [0u8; 10]; // u32::MAX is 10 digits
+    let mut pos = 10;
     if n == 0 {
         buf.push(b'0');
         return;
     }
-    let start = buf.len();
     while n > 0 {
-        buf.push(b'0' + (n % 10) as u8);
+        pos -= 1;
+        tmp[pos] = b'0' + (n % 10) as u8;
         n /= 10;
     }
-    buf[start..].reverse(); // digits were pushed in reverse
+    buf.extend_from_slice(&tmp[pos..]);
 }
 
 fn write_float(buf: &mut Vec<u8>, n: f64, decimal_places: usize) {
