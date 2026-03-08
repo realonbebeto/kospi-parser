@@ -192,123 +192,83 @@ fn parse_message<'a>(msg: &'a [u8], pkt_time: u32) -> Result<Message<'a>, ParseE
 
     let acc_time = parse_hhmmssuu((&msg[206..214]).try_into().unwrap());
     let issue_code = unsafe { str::from_utf8_unchecked(&msg[5..17]) };
-    let bqty5 = str::from_utf8(&msg[82..89])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bqty5 = unsafe { str::from_utf8_unchecked(&msg[82..89]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bprice5 = str::from_utf8(&msg[77..82])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bprice5 = unsafe { str::from_utf8_unchecked(&msg[77..82]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bqty4 = str::from_utf8(&msg[70..77])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bqty4 = unsafe { str::from_utf8_unchecked(&msg[70..77]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bprice4 = str::from_utf8(&msg[65..70])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bprice4 = unsafe { str::from_utf8_unchecked(&msg[65..70]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bqty3 = str::from_utf8(&msg[58..65])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bqty3 = unsafe { str::from_utf8_unchecked(&msg[58..65]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bprice3 = str::from_utf8(&msg[53..58])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bprice3 = unsafe { str::from_utf8_unchecked(&msg[53..58]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bqty2 = str::from_utf8(&msg[46..53])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bqty2 = unsafe { str::from_utf8_unchecked(&msg[46..53]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bprice2 = str::from_utf8(&msg[41..46])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bprice2 = unsafe { str::from_utf8_unchecked(&msg[41..46]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bqty1 = str::from_utf8(&msg[34..41])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bqty1 = unsafe { str::from_utf8_unchecked(&msg[34..41]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let bprice1 = str::from_utf8(&msg[29..34])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let bprice1 = unsafe { str::from_utf8_unchecked(&msg[29..34]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aqty5 = str::from_utf8(&msg[149..156])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aqty5 = unsafe { str::from_utf8_unchecked(&msg[149..156]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aprice5 = str::from_utf8(&msg[144..149])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aprice5 = unsafe { str::from_utf8_unchecked(&msg[144..149]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aqty4 = str::from_utf8(&msg[137..144])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aqty4 = unsafe { str::from_utf8_unchecked(&msg[137..144]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aprice4 = str::from_utf8(&msg[132..137])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aprice4 = unsafe { str::from_utf8_unchecked(&msg[132..137]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aqty3 = str::from_utf8(&msg[125..132])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aqty3 = unsafe { str::from_utf8_unchecked(&msg[125..132]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aprice3 = str::from_utf8(&msg[120..125])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aprice3 = unsafe { str::from_utf8_unchecked(&msg[120..125]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aqty2 = str::from_utf8(&msg[113..120])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aqty2 = unsafe { str::from_utf8_unchecked(&msg[113..120]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aprice2 = str::from_utf8(&msg[108..113])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aprice2 = unsafe { str::from_utf8_unchecked(&msg[108..113]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aqty1 = str::from_utf8(&msg[101..108])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aqty1 = unsafe { str::from_utf8_unchecked(&msg[101..108]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
-    let aprice1 = str::from_utf8(&msg[96..101])
-        .map_err(|_| ParseError::InvalidUtf8)?
-        .trim()
+    let aprice1 = unsafe { str::from_utf8_unchecked(&msg[96..101]) }
         .parse::<f64>()
         .map_err(|_| ParseError::InvalidNumber)?;
 
