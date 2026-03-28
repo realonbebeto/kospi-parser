@@ -41,7 +41,7 @@ fn main() {
     });
 
     if if_sort {
-        messages.sort_unstable_by(|a, b| {
+        messages.sort_by(|a, b| {
             a.acc_time
                 .partial_cmp(&b.acc_time)
                 .unwrap_or(std::cmp::Ordering::Equal)
