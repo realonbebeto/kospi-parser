@@ -1,5 +1,6 @@
 use std::{env, fs::File, io::Write};
 
+use memchr::memchr;
 use memmap2::Mmap;
 
 fn main() {
@@ -8,34 +9,36 @@ fn main() {
     let file = File::open("mdf-kospi200.20110216-0.pcap").unwrap();
 
     let data = unsafe { Mmap::map(&file).unwrap() };
-
     let flag = is_big_endian(&data);
+    let nthreads = std::thread::available_parallelism().unwrap().get();
 
-    let mut messages = Vec::with_capacity(2048);
+    let mut messages: Vec<Message<'_>> = Vec::with_capacity(2048);
 
-    // Global header size
-    let mut offset = 24;
+    std::thread::scope(|scope| {
+        let mut offset = 24;
+        let (tx, rx) = std::sync::mpsc::sync_channel(nthreads);
+        let chunk_size = (data.len() - offset) / nthreads;
+        for _ in 0..nthreads {
+            let start = offset;
+            let end = (offset + chunk_size).min(data.len());
+            let end = if end == data.len() {
+                data.len()
+            } else {
+                let nend_at = memchr(0xff, &data[end..]).unwrap();
+                end + nend_at + 1
+            };
 
-    while offset + 16 <= data.len() {
-        let packet_header = parse_packet_header(&data[offset..offset + 16], flag);
-
-        // Ignore the packet header bytes
-        offset += 16;
-
-        if packet_header.len == 257 {
-            // Select the bytes to be parser
-            let dd = &data[offset..offset + packet_header.len as usize];
-
-            let message = parse_message(dd, packet_header.ts_sec).unwrap();
-            messages.push(message);
-
-            // Update the offset to handle next packet
-            offset += packet_header.len as usize;
-        } else {
-            // Ignore the packet bytes of irrelevant data
-            offset += packet_header.len as usize;
+            let data = &data[start..end];
+            offset = end;
+            let tx = tx.clone();
+            scope.spawn(move || tx.send(chunk_handler(data, flag)));
         }
-    }
+
+        drop(tx);
+        for recv_messages in rx {
+            messages.extend(recv_messages);
+        }
+    });
 
     if if_sort {
         messages.sort_unstable_by(|a, b| {
@@ -52,6 +55,32 @@ fn main() {
     }
 
     std::io::stdout().lock().write_all(&buf).unwrap();
+}
+
+fn chunk_handler(map: &[u8], flag: bool) -> Vec<Message<'_>> {
+    let mut msgs = Vec::with_capacity(2048);
+    let mut offset = 0;
+    while offset < map.len() {
+        let packet_header = parse_packet_header(&map[offset..offset + 16], flag);
+
+        // Ignore the packet header bytes
+        offset += 16;
+
+        if packet_header.len == 257 {
+            // Select the bytes to be parser
+            let dd = &map[offset..offset + packet_header.len as usize];
+
+            msgs.push(parse_message(dd, packet_header.ts_sec).unwrap());
+
+            // Update the offset to handle next packet
+            offset += packet_header.len as usize;
+        } else {
+            // Ignore the packet bytes of irrelevant data
+            offset += packet_header.len as usize;
+        }
+    }
+
+    msgs
 }
 
 #[allow(unused)]
@@ -81,6 +110,8 @@ struct Message<'a> {
     aqty5: f64,
     aprice5: f64,
 }
+
+unsafe impl<'a> Send for Message<'a> {}
 
 impl Message<'_> {
     pub fn write_bytes(&self, buf: &mut Vec<u8>) {
